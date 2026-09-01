@@ -1,7 +1,6 @@
 # Input validation. Plan only, no credentials.
 
 mock_provider "cloudflare" {
-  override_during = plan
 }
 
 variables {
