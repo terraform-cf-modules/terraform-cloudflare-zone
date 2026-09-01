@@ -1,0 +1,143 @@
+---
+#
+# This is the canonical configuration for `README.md`.
+# Run `make docs` for the terraform-docs block, the readme workflow rebuilds the rest.
+#
+
+name: Terraform Cloudflare Zone
+
+intro: |-
+  With our comprehensive DevOps toolkit, streamline operations, automate workflows, enhance collaboration and deploy with confidence.
+
+badges_text: "Latest Release | License | Changelog"
+
+about: |-
+  Zones, DNS records, DNSSEC, TLS settings, custom hostnames, and cache configuration.
+
+license: "APACHE"
+
+github_repo: terraform-cf-modules/terraform-cloudflare-zone
+
+badges:
+  - name: "Terraform"
+    image: "https://img.shields.io/badge/Terraform-v1.10.0-green"
+    url: "https://www.terraform.io"
+
+  - name: "Licence"
+    image: "https://img.shields.io/badge/License-APACHE-blue.svg"
+    url: "LICENSE"
+
+  - name: "Changelog"
+    image: "https://img.shields.io/badge/Changelog-blue"
+    url: "CHANGELOG.md"
+
+prerequisites:
+  - name: Terraform
+    url: https://learn.hashicorp.com/terraform/getting-started/install.html
+    version: ">= 1.10.0"
+
+  - name: OpenTofu
+    url: https://opentofu.org/docs/intro/install/
+    version: ">= 1.9.0"
+
+providers:
+  - name: cloudflare
+    url: https://registry.terraform.io/providers/cloudflare/cloudflare/latest
+    version: "~> 5.24"
+
+description: |-
+  Creates a Cloudflare zone together with its DNS records, DNSSEC, TLS posture, custom hostnames and cache
+  configuration. The root module gets you from "I own this domain" to "it resolves and it is secured" in one
+  block, with a secure baseline applied by default: SSL full, minimum TLS 1.2, always use HTTPS, TLS 1.3 and
+  automatic HTTPS rewrites. Every one of those defaults is overridable, and setting any of them to null leaves
+  the current Cloudflare value untouched.
+
+  Set `create_zone = false` and pass `zone_id` to manage records and settings on a zone somebody else created.
+
+  Six composable submodules are published alongside the root module: `dns-record`, `dnssec`, `settings`, `ssl`,
+  `custom-hostname` and `cache`.
+
+  Targets Cloudflare provider v5. Cloudflare rewrote the provider from its OpenAPI spec in v5.0.0 and renamed
+  most resources, so `cloudflare_record` is now `cloudflare_dns_record` and the single
+  `cloudflare_zone_settings_override` resource is now one `cloudflare_zone_setting` per setting.
+
+usage: |-
+  ### Root module
+
+  ```hcl
+  module "zone" {
+    source  = "terraform-cf-modules/zone/cloudflare"
+    version = "~> 0.1"
+
+    enabled    = true
+    account_id = var.account_id
+    zone_name  = "example.com"
+
+    dns_records = {
+      apex = { name = "example.com", type = "A", content = "192.0.2.1", proxied = true }
+      www  = { name = "www.example.com", type = "CNAME", content = "example.com", proxied = true }
+      spf  = { name = "example.com", type = "TXT", content = "v=spf1 -all", ttl = 3600 }
+    }
+
+    dnssec_enabled = true
+  }
+  ```
+
+  ### Existing zone
+
+  ```hcl
+  module "records" {
+    source  = "terraform-cf-modules/zone/cloudflare"
+    version = "~> 0.1"
+
+    create_zone = false
+    zone_id     = var.zone_id
+
+    dns_records = {
+      api = { name = "api.example.com", type = "A", content = "192.0.2.2", proxied = true }
+    }
+
+    # Leave the zone's existing settings alone.
+    ssl_mode                 = null
+    min_tls_version          = null
+    always_use_https         = null
+    tls_1_3                  = null
+    automatic_https_rewrites = null
+  }
+  ```
+
+  ### Submodule
+
+  ```hcl
+  module "records" {
+    source  = "terraform-cf-modules/zone/cloudflare//modules/dns-record"
+    version = "~> 0.1"
+
+    enabled = true
+    zone_id = var.zone_id
+
+    records = {
+      apex = { name = "example.com", type = "A", content = "192.0.2.1", proxied = true }
+    }
+  }
+  ```
+
+  ### Wrapper for many zones
+
+  ```hcl
+  module "zones" {
+    source = "terraform-cf-modules/zone/cloudflare//wrappers"
+
+    defaults = {
+      account_id      = var.account_id
+      ssl_mode        = "strict"
+      min_tls_version = "1.2"
+      dnssec_enabled  = true
+    }
+
+    items = {
+      example_com = { zone_name = "example.com" }
+      example_org = { zone_name = "example.org" }
+    }
+  }
+  ```
