@@ -1,43 +1,114 @@
+<!-- This file was automatically generated from `README.yaml`. Make all changes to `README.yaml` and run `make readme` to rebuild this file. -->
 <p align="center">
-  <img width="1000" alt="CloudDrove Banner" src="https://clouddrove.s3.ca-central-1.amazonaws.com/img/clouddrove-github-cover.png" />
+  <img width="1024" height="250" alt="CloudDrove" src="https://clouddrove.s3.ca-central-1.amazonaws.com/Logo/banner.png" />
+</p>
+<h1 align="center">
+    Terraform Cloudflare Zone
+</h1>
+
+<p align="center" style="font-size: 1.2rem;">
+    With our comprehensive DevOps toolkit, streamline operations, automate workflows, enhance collaboration and deploy with confidence.
 </p>
 
-<h1 align="center">Terraform Cloudflare Zone</h1>
-<p align="center"><em>Zones, DNS records, DNSSEC, TLS settings, custom hostnames, and cache configuration.</em></p>
-
 <p align="center">
-  <a href="https://www.terraform.io"><img src="https://img.shields.io/badge/terraform-%3E%3D%201.12-844FBA?logo=terraform&logoColor=white" alt="Terraform" /></a>
-  <a href="https://opentofu.org"><img src="https://img.shields.io/badge/opentofu-%3E%3D%201.12-FFDA18?logo=opentofu&logoColor=black" alt="OpenTofu" /></a>
-  <a href="https://registry.terraform.io/providers/cloudflare/cloudflare/latest"><img src="https://img.shields.io/badge/provider-cloudflare%20~%3E%205.24-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Provider" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" /></a>
-</p>
 
----
+<a href="https://www.terraform.io">
+  <img src="https://img.shields.io/badge/Terraform-v1.12.0-green" alt="Terraform">
+</a>
+<a href="LICENSE">
+  <img src="https://img.shields.io/badge/License-APACHE-blue.svg" alt="Licence">
+</a>
+<a href="CHANGELOG.md">
+  <img src="https://img.shields.io/badge/Changelog-blue" alt="Changelog">
+</a>
+<a href="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/tf-checks.yml">
+  <img src="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/tf-checks.yml/badge.svg" alt="tf-checks">
+</a>
+<a href="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/tflint.yml">
+  <img src="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/tflint.yml/badge.svg" alt="tf-lint">
+</a>
+<a href="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/checkov.yml">
+  <img src="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/checkov.yml/badge.svg" alt="checkov">
+</a>
+<a href="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/test.yml">
+  <img src="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/actions/workflows/test.yml/badge.svg" alt="test">
+</a>
+
+</p>
+<hr>
+
 
 Creates a Cloudflare zone together with its DNS records, DNSSEC, TLS posture, custom hostnames and cache
-configuration.
+configuration. The root module takes a domain from "I own this name" to "it resolves and it is secured" in a
+single block, and the six submodules underneath it are addressable on their own when you only need one piece.
 
-The root module is the common path: it gets you from "I own this domain" to "it resolves and it is secured" in
-one block. It applies a secure baseline by default, and every default is overridable.
+The problem it solves is that a correct Cloudflare zone is not one resource. It is a zone, a pile of DNS
+records, a DNSSEC key, one `cloudflare_zone_setting` per setting, a Universal SSL toggle, certificate packs
+and a cache topology, each with its own required ordering and its own set of values the API silently rejects.
+This module wires those together, validates the enumerated fields at plan time rather than at apply time, and
+exposes the values you actually need afterwards (name servers, the DS record for the registrar, custom
+hostname ownership verification tokens, certificate validation records).
 
-| Baseline setting | Default | Override with |
-|------------------|---------|---------------|
-| `ssl` | `full` | `ssl_mode` |
-| `min_tls_version` | `1.2` | `min_tls_version` |
-| `always_use_https` | `on` | `always_use_https` |
-| `tls_1_3` | `on` | `tls_1_3` |
-| `automatic_https_rewrites` | `on` | `automatic_https_rewrites` |
+**The opinion it encodes is a secure TLS baseline, applied by default and overridable in full.** These five
+settings are the only ones the module writes without being asked:
 
-Set any of those to `null` and the module stops managing that setting, leaving whatever Cloudflare currently
-has. Anything else goes in `zone_settings`, which is keyed by the Cloudflare setting ID.
+| Setting | Default | Why this default |
+|---------|---------|------------------|
+| `ssl_mode` | `full` | Encrypts the edge to origin hop. `strict` is stronger but requires a valid certificate on the origin, so it is not safe as a default. |
+| `min_tls_version` | `1.2` | TLS 1.0 and 1.1 are deprecated and fail most compliance baselines. |
+| `always_use_https` | `on` | Plain HTTP is redirected rather than served. |
+| `tls_1_3` | `on` | Faster handshake, forward secrecy on every suite. |
+| `automatic_https_rewrites` | `on` | Rewrites insecure subresource references in HTML, so enabling HTTPS does not produce mixed content. |
 
-Registry address: `terraform-cf-modules/zone/cloudflare`.
+Every one of those is overridable, and setting any of them to `null` leaves whatever Cloudflare currently has
+in place untouched, which is what you want when this module owns DNS but somebody else owns the TLS posture.
+Everything else in the module defaults to null or an empty map, so nothing is created that you did not ask for.
+
+Set `create_zone = false` and pass `zone_id` to manage records and settings on a zone somebody else created.
+For many zones at once, the `wrappers` directory takes a `defaults` object plus an `items` map and calls the
+root module once per entry.
+
+Targets Cloudflare provider v5. Cloudflare regenerated the provider from its OpenAPI spec in v5.0.0 and
+renamed most resources, so `cloudflare_record` is now `cloudflare_dns_record`, and the single
+`cloudflare_zone_settings_override` resource became one `cloudflare_zone_setting` per setting. Examples
+written against provider v4 will not apply here.
+
+
+## Prerequisites and Providers
+
+This table contains both Prerequisites and Providers:
+
+| Description | Name | Version |
+|-------------|------|---------|
+| Prerequisite | Terraform | >= 1.12.0 |
+| Prerequisite | OpenTofu | >= 1.12.0 |
+| Provider | cloudflare | ~> 5.24 |
 
 ---
 
-## Usage
 
-### Create a zone
+## 🧩 Submodules
+
+Each submodule is separately addressable with the double slash source syntax, so you can take only the piece you need instead of the whole root module.
+
+| Submodule | Source | Description |
+|-----------|--------|-------------|
+| `dns-record` | `terraform-cf-modules/zone/cloudflare//modules/dns-record` | One `cloudflare_dns_record` per entry in a keyed map. Covers the simple types that use `content` and the structured types (SRV, CAA, LOC, SSHFP, TLSA, DS, NAPTR, CERT, SVCB, HTTPS) that use the `data` object instead. |
+| `dnssec` | `terraform-cf-modules/zone/cloudflare//modules/dnssec` | `cloudflare_zone_dnssec`. Signs the zone and exposes the DS record, digest, key tag and public key so you can hand them to the registrar. |
+| `settings` | `terraform-cf-modules/zone/cloudflare//modules/settings` | `cloudflare_zone_setting` (one per setting ID), plus `cloudflare_zone_dns_settings`, `cloudflare_zone_hold`, `cloudflare_url_normalization_settings` and `cloudflare_managed_transforms`. This is where the secure baseline is written. |
+| `ssl` | `terraform-cf-modules/zone/cloudflare//modules/ssl` | `cloudflare_universal_ssl_setting`, `cloudflare_total_tls`, `cloudflare_certificate_pack`, `cloudflare_custom_ssl` and `cloudflare_hostname_tls_setting`. Certificate packs need Advanced Certificate Manager. |
+| `custom-hostname` | `terraform-cf-modules/zone/cloudflare//modules/custom-hostname` | SSL for SaaS: `cloudflare_custom_hostname`, `cloudflare_custom_hostname_fallback_origin` and `cloudflare_regional_hostname`. Exposes the per hostname ownership verification tokens your customers have to publish. |
+| `cache` | `terraform-cf-modules/zone/cloudflare//modules/cache` | `cloudflare_tiered_cache`, `cloudflare_argo_tiered_caching`, `cloudflare_regional_tiered_cache`, `cloudflare_zone_cache_reserve`, `cloudflare_zone_cache_variants` and `cloudflare_argo_smart_routing`. Argo and Cache Reserve are billed separately. |
+
+---
+
+
+## 🚀 Usage
+
+### Root module
+
+Creates the zone, points the apex and `www` at an origin, signs the zone, and applies the secure TLS baseline
+described above.
 
 ```hcl
 module "zone" {
@@ -51,25 +122,23 @@ module "zone" {
   dns_records = {
     apex = { name = "example.com", type = "A", content = "192.0.2.1", proxied = true }
     www  = { name = "www.example.com", type = "CNAME", content = "example.com", proxied = true }
-    spf  = { name = "example.com", type = "TXT", content = "v=spf1 -all", ttl = 3600 }
     mail = { name = "example.com", type = "MX", content = "mx1.example.net", priority = 10, ttl = 3600 }
+    spf  = { name = "example.com", type = "TXT", content = "v=spf1 include:_spf.example.net -all", ttl = 3600 }
   }
 
   dnssec_enabled = true
 }
 
-output "name_servers" {
-  value = module.zone.name_servers
-}
-
+# Hand this to the registrar to complete the DNSSEC chain of trust.
 output "ds_record" {
   value = module.zone.dnssec_ds
 }
 ```
 
-Set the name servers from `name_servers` at your registrar, then publish `dnssec_ds` there to complete DNSSEC.
+### DNS on a zone somebody else owns
 
-### Manage an existing zone
+`create_zone = false` attaches the module to an existing zone by ID, so it manages records only. Setting the
+five baseline inputs to `null` leaves that zone's current TLS configuration exactly as it is.
 
 ```hcl
 module "records" {
@@ -81,9 +150,22 @@ module "records" {
 
   dns_records = {
     api = { name = "api.example.com", type = "A", content = "192.0.2.2", proxied = true }
+
+    # Structured types use `data`, not `content`. Cloudflare rejects `content` on these.
+    caa = {
+      name = "example.com"
+      type = "CAA"
+      data = { flags = 0, tag = "issue", value = "pki.goog" }
+    }
+
+    sip = {
+      name = "_sip._tcp.example.com"
+      type = "SRV"
+      data = { priority = 10, weight = 5, port = 5060, target = "sip.example.net" }
+    }
   }
 
-  # Own DNS only; leave the zone's existing settings alone.
+  # This configuration owns DNS only. Leave the zone's TLS posture alone.
   ssl_mode                 = null
   min_tls_version          = null
   always_use_https         = null
@@ -92,11 +174,94 @@ module "records" {
 }
 ```
 
-### Many zones at once
+### A submodule on its own
+
+Each submodule is usable without the root module. This is the shape to reach for when DNS and TLS are owned by
+different teams or live in different state files.
+
+```hcl
+module "records" {
+  source  = "terraform-cf-modules/zone/cloudflare//modules/dns-record"
+  version = "~> 0.1"
+
+  enabled = true
+  zone_id = var.zone_id
+
+  records = {
+    apex = { name = "example.com", type = "A", content = "192.0.2.1", proxied = true }
+    www  = { name = "www.example.com", type = "CNAME", content = "example.com", proxied = true }
+  }
+}
+
+module "tls" {
+  source  = "terraform-cf-modules/zone/cloudflare//modules/settings"
+  version = "~> 0.1"
+
+  enabled = true
+  zone_id = var.zone_id
+
+  # Keyed by the Cloudflare setting ID, so any setting the API exposes is reachable.
+  zone_settings = {
+    ssl                      = "strict"
+    min_tls_version          = "1.2"
+    always_use_https         = "on"
+    tls_1_3                  = "on"
+    automatic_https_rewrites = "on"
+    browser_cache_ttl        = 14400
+  }
+}
+```
+
+### SSL for SaaS
+
+Serving your customers' own domains from your zone. The fallback origin must be a proxied record inside your
+zone, and each custom hostname stays at status `pending` until the customer publishes the ownership
+verification token exposed on the output.
+
+```hcl
+module "saas" {
+  source  = "terraform-cf-modules/zone/cloudflare//modules/custom-hostname"
+  version = "~> 0.1"
+
+  enabled = true
+  zone_id = var.zone_id
+
+  fallback_origin = "fallback.example.com"
+
+  custom_hostnames = {
+    acme = {
+      hostname             = "www.acme-customer.com"
+      custom_origin_server = "origin.example.com"
+
+      ssl = {
+        method                = "txt"
+        type                  = "dv"
+        certificate_authority = "google"
+        bundle_method         = "ubiquitous"
+        wildcard              = false
+
+        settings = {
+          min_tls_version = "1.2"
+          http2           = "on"
+          tls_1_3         = "on"
+        }
+      }
+    }
+  }
+}
+
+# Give each customer their verification token.
+output "ownership_verification" {
+  value = module.saas.ownership_verification
+}
+```
+
+### Many zones from one block
 
 ```hcl
 module "zones" {
-  source = "terraform-cf-modules/zone/cloudflare//wrappers"
+  source  = "terraform-cf-modules/zone/cloudflare//wrappers"
+  version = "~> 0.1"
 
   defaults = {
     account_id      = var.account_id
@@ -108,202 +273,76 @@ module "zones" {
   items = {
     example_com = { zone_name = "example.com" }
     example_org = { zone_name = "example.org" }
-    legacy      = { zone_name = "legacy.example", enabled = false }
   }
 }
 ```
 
 ---
 
-## Submodules
 
-Each one works on its own against any zone, whether or not this module created it.
+## 📦 Examples
 
-| Submodule | Manages |
-|-----------|---------|
-| [`dns-record`](modules/dns-record) | `cloudflare_dns_record` for every record type, simple and structured |
-| [`dnssec`](modules/dnssec) | `cloudflare_zone_dnssec` |
-| [`settings`](modules/settings) | `cloudflare_zone_setting`, `cloudflare_zone_dns_settings`, `cloudflare_zone_hold`, `cloudflare_url_normalization_settings`, `cloudflare_managed_transforms` |
-| [`ssl`](modules/ssl) | `cloudflare_universal_ssl_setting`, `cloudflare_total_tls`, `cloudflare_certificate_pack`, `cloudflare_custom_ssl`, `cloudflare_hostname_tls_setting` |
-| [`custom-hostname`](modules/custom-hostname) | `cloudflare_custom_hostname`, `cloudflare_custom_hostname_fallback_origin`, `cloudflare_regional_hostname` |
-| [`cache`](modules/cache) | `cloudflare_tiered_cache`, `cloudflare_argo_tiered_caching`, `cloudflare_regional_tiered_cache`, `cloudflare_zone_cache_reserve`, `cloudflare_zone_cache_variants`, `cloudflare_argo_smart_routing` |
+> ⚠️ **Important:** Avoid using the `main` branch directly, as it may include unstable changes. Always use stable [release versions](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/releases).
 
-```hcl
-module "cache" {
-  source  = "terraform-cf-modules/zone/cloudflare//modules/cache"
-  version = "~> 0.1"
-
-  zone_id      = var.zone_id
-  tiered_cache = "on"
-}
-```
+Explore real-world usage scenarios and implementation patterns in the [`examples/`](./examples/) directory.
 
 ---
 
-## Examples
 
-| Example | What it shows |
-|---------|---------------|
-| [`examples/basic`](examples/basic) | Minimum viable zone: apex, www and the secure baseline |
-| [`examples/complete`](examples/complete) | Every optional feature turned on |
-| [`examples/dns-records`](examples/dns-records) | Structured record types (`CAA`, `SRV`, `SSHFP`) on an existing zone |
-| [`examples/ssl-for-saas`](examples/ssl-for-saas) | Custom hostnames, fallback origin and customer domain validation |
+## 📥 Inputs and Outputs
+
+Detailed input variables and output values are documented for easier integration and day-to-day usage.
+
+📘 [View full documentation](docs/io.md)
 
 ---
 
-## DNS records
 
-`dns_records` is a map keyed by a stable identifier. The key is only a state address, so it does not have to
-match the record name, but renaming a key destroys and recreates the record.
+## 📝 Changelog
 
-Simple types set `content`:
+Track module updates, improvements, and breaking changes across versions.
 
-```hcl
-apex = { name = "example.com", type = "A", content = "192.0.2.1", proxied = true }
-```
-
-Structured types set `data` instead, whose fields differ per record type:
-
-```hcl
-caa = {
-  name = "example.com"
-  type = "CAA"
-  ttl  = 3600
-  data = { flags = 0, tag = "issue", value = "letsencrypt.org" }
-}
-
-sip = {
-  name = "_sip._tcp.example.com"
-  type = "SRV"
-  ttl  = 3600
-  data = { priority = 10, weight = 20, port = 5060, target = "sip.example.net" }
-}
-```
-
-Rules the module enforces at plan time:
-
-- `type` must be one of the 21 types the provider supports.
-- `ttl` is `1` for automatic, or between 30 and 86400.
-- Every record sets either `content` or `data`.
-- `MX` and `URI` records set `priority`.
-- Only `A`, `AAAA` and `CNAME` records can be proxied.
+📌 [View Changelog](CHANGELOG.md)
 
 ---
 
-## Zone settings
 
-Provider v5 replaced the single `cloudflare_zone_settings_override` resource with one `cloudflare_zone_setting`
-per setting, whose `value` is dynamic. `zone_settings` therefore takes raw values of whatever type the setting
-wants:
+## ✨ Contributors
 
-```hcl
-zone_settings = {
-  brotli            = "on"
-  browser_cache_ttl = 14400
-  security_level    = "medium"
-}
-```
+Big thanks to our contributors for elevating our project with their dedication and expertise!
 
-Entries here override the five named baseline inputs. Setting IDs are validated for shape only, because
-Cloudflare adds settings without a provider release; an unknown ID is rejected by the API at apply time. See the
-[zone settings API reference](https://developers.cloudflare.com/api/resources/zones/subresources/settings/).
+<div align="center">
+  <a href="https://github.com/terraform-cf-modules/terraform-cloudflare-zone/graphs/contributors" title="Contributors">
+    <img src="https://contrib.rocks/image?repo=terraform-cf-modules/terraform-cloudflare-zone" />
+  </a>
+</div>
+
+All contributors must follow the [Conventional Commits](https://www.conventionalcommits.org) specification for commit messages.
 
 ---
 
-## Things that finish outside Terraform
 
-Three features apply cleanly and then wait on something Terraform cannot do:
+## 🚀 Our Accomplishment
 
-| Feature | What still has to happen |
-|---------|--------------------------|
-| DNSSEC | Publish `dnssec_ds` at the registrar |
-| Certificate packs | Publish `certificate_pack_validation_records` |
-| Custom hostnames | The customer publishes `custom_hostname_ownership_verification` in their own DNS |
+We maintain Terraform modules across AWS, Azure, Google Cloud, DigitalOcean, Hetzner Cloud and Cloudflare 🙌.
 
-A successful apply on any of these means "ordered", not "issued".
+- [**Terraform Module Registry**](https://registry.terraform.io/namespaces/terraform-cf-modules): Discover our Cloudflare modules here.
+- [**Full module catalog**](https://github.com/clouddrove/toc): Every CloudDrove module and submodule, across every cloud.
 
 ---
 
-## Repository layout
+## Notes
 
-```
-terraform.tf          provider and version requirements
-main.tf               zone plus the submodule calls
-variables.tf          root module inputs
-outputs.tf            root module outputs
-locals.tf             enabled switch, zone_id resolution, settings merge
-modules/<name>/       composable building blocks, same file layout
-examples/             basic, complete, dns-records, ssl-for-saas
-wrappers/             for_each wrapper for many zones
-tests/                native terraform test files
-docs/architecture.md  resource map, ordering, provider quirks
-```
+- Do not use the `main` branch for production deployments.
+- Always reference a stable version using Git tags or official releases.
+- Using tagged versions ensures consistency, stability, and reproducible deployments.
 
 ---
 
-## Local development
+## Feedback
 
-```bash
-pre-commit install
+Report issues or request features on [GitHub](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/issues), or write to [business@clouddrove.com](mailto:business@clouddrove.com).
 
-make fmt        # terraform fmt -recursive
-make validate   # init and validate every directory
-make lint       # tflint
-make docs       # regenerate the terraform-docs blocks
-make test       # mocked terraform test, no credentials needed
-make security   # trivy, checkov, gitleaks
-make ci         # all of the above
-```
+## About us
 
-`make test` runs against `mock_provider`, so it needs no Cloudflare credentials. The live tests in
-`tests/integration.tftest.hcl` run only on schedule and manual dispatch, and they attach to an existing test
-zone rather than registering a domain.
-
----
-
-## CI
-
-Most workflows call the shared, actively maintained
-[clouddrove/github-shared-workflows](https://github.com/clouddrove/github-shared-workflows) at `@v2`, so the
-standard changes in one place for every repository.
-
-| Workflow | Source | Purpose |
-|----------|--------|---------|
-| `tf-checks` | shared | init and validate every example |
-| `tflint` | shared | lint |
-| `checkov` | shared | policy scan |
-| `gitleaks` | shared | secret scan |
-| `pr_checks` | shared | Conventional Commit pull request title |
-| `auto_assignee` | shared | reviewer assignment |
-| `automerge` | shared | auto merge on green |
-| `stale_pr` | shared | stale handling |
-| `readme` | shared | rebuild README from README.yaml |
-| `tag-release` | shared | tag and changelog on merge |
-| `opentofu` | local | OpenTofu compatibility |
-| `test` | local | `terraform test` with mocked provider |
-| `integration` | local | live apply against a test account, scheduled only |
-
-### Required organisation secrets
-
-| Secret | Used by |
-|--------|---------|
-| `GITHUB` | `tflint`, `tag-release`, `auto_assignee`, `automerge`, `readme` |
-| `SLACK_WEBHOOK_TERRAFORM` | `readme` |
-| `CLOUDFLARE_API_TOKEN` | `integration` |
-| `CLOUDFLARE_TEST_ACCOUNT_ID` | `integration` |
-| `CLOUDFLARE_TEST_ZONE_ID` | `integration` |
-
----
-
-## Inputs and outputs
-
-<!-- BEGIN_TF_DOCS -->
-<!-- END_TF_DOCS -->
-
----
-
-## License
-
-Apache 2.0. See [LICENSE](LICENSE).
-
-Maintained by [CloudDrove](https://clouddrove.com) and [Cloud Wizz](https://github.com/cloud-wizz).
+At [CloudDrove](https://clouddrove.com), we build reliable, secure and cost efficient cloud native solutions. Join our [Slack community](https://www.launchpass.com/devops-talks).
