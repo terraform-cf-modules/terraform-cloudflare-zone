@@ -1,0 +1,40 @@
+# Terraform Cloudflare Zone
+
+> Zones, DNS records, DNSSEC, TLS settings, custom hostnames, and cache configuration.
+
+Terraform module for Cloudflare, maintained by CloudDrove. Source: `terraform-cf-modules/zone/cloudflare`. Repository: https://github.com/terraform-cf-modules/terraform-cloudflare-zone
+
+Requires Terraform >= 1.12.0 (or OpenTofu >= 1.12) and the `cloudflare/cloudflare` provider ~> 5.24. Provider v5 renamed most resources from v4, so verify resource names against the current provider docs rather than older examples.
+
+## Usage
+
+```hcl
+module "this" {
+  source  = "terraform-cf-modules/zone/cloudflare"
+  version = "~> 0.1"
+}
+```
+
+## Submodules
+
+Each is separately addressable with the double slash source syntax.
+
+- [cache](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/modules/cache): `terraform-cf-modules/zone/cloudflare//modules/cache`
+- [custom-hostname](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/modules/custom-hostname): `terraform-cf-modules/zone/cloudflare//modules/custom-hostname`
+- [dns-record](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/modules/dns-record): `terraform-cf-modules/zone/cloudflare//modules/dns-record`
+- [dnssec](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/modules/dnssec): `terraform-cf-modules/zone/cloudflare//modules/dnssec`
+- [settings](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/modules/settings): `terraform-cf-modules/zone/cloudflare//modules/settings`
+- [ssl](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/modules/ssl): `terraform-cf-modules/zone/cloudflare//modules/ssl`
+
+## Documentation
+
+- [README](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/blob/main/README.md): overview and usage
+- [Inputs and outputs](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/blob/main/docs/io.md): every variable and output
+- [Examples](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/tree/main/examples): runnable configurations
+- [Architecture](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/blob/main/docs/architecture.md): resource map and provider quirks
+
+## Related
+
+- [All CloudDrove modules](https://github.com/clouddrove/toc): every module and submodule across AWS, Azure, Google Cloud, DigitalOcean, Hetzner Cloud and Cloudflare
+- [Organisation](https://github.com/terraform-cf-modules): the Cloudflare module family
+- [Terraform Registry](https://registry.terraform.io/namespaces/terraform-cf-modules)
