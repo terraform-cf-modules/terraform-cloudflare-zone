@@ -158,7 +158,6 @@ variable "dns_settings" {
   description = "Zone level DNS settings such as CNAME flattening, nameserver selection and the SOA record. Null leaves the Cloudflare defaults alone."
   type = object({
     flatten_all_cnames  = optional(bool)
-    foundation_dns      = optional(bool)
     multi_provider      = optional(bool)
     ns_ttl              = optional(number)
     secondary_overrides = optional(bool)
