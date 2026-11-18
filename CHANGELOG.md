@@ -4,6 +4,12 @@ All notable changes to this module are documented here.
 This project follows [Semantic Versioning](https://semver.org/) and
 [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [v0.0.2](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/releases/tag/v0.0.2) - 2026-11-18
+
+### Bug Fixes
+
+- drop foundation_dns from zone DNS settings (#3)
+
 ## [v0.0.1](https://github.com/terraform-cf-modules/terraform-cloudflare-zone/releases/tag/v0.0.1) - 2026-09-01
 
 ### Features
